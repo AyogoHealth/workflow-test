@@ -116,11 +116,21 @@ jobs:
     steps:
       - uses: actions/download-artifact@v3
 
+      - name: Create tag
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/release-${{ needs.Setup.outputs.date }}',
+              sha: context.sha
+            })
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           draft: true
-          target_commitish: ${{ github.sha }}
           tag_name: release-${{ needs.Setup.outputs.date }}
           name: Release ${{ needs.Setup.outputs.date }}
           files: |
