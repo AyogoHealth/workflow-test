@@ -1,0 +1,132 @@
+name: Test
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      date: ${{ steps.get-date.outputs.date }}
+    steps:
+    - name: Get Date
+      id: get-date
+      shell: bash
+      run: echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d")"
+
+  Analysis:
+    needs: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run analysis
+        shell: bash
+        run: |
+          echo 'result 1' > report-1.txt
+          sleep 10
+          echo 'result 2' > report-2.txt
+          sleep 15
+          echo 'result 3' > report-3.txt
+          sleep 5
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: analysis-report
+          path: report-*.txt
+          retention-days: 1
+
+      - name: Cancel workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  Tests:
+    needs: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run tests
+        shell: bash
+        run: |
+          echo 'test result 1' > test-report.txt
+          sleep 10
+          echo 'test result 2' >> test-report.txt
+          sleep 15
+          echo 'test result 3' >> test-report.txt
+          sleep 5
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test-report
+          path: test-report.txt
+          retention-days: 1
+
+      - name: Cancel workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  Build-iOS:
+    needs: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: iOS Build
+        shell: bash
+        run: echo 'iOS' > ios-build.txt
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ios-build
+          path: ios-build.txt
+          retention-days: 1
+
+      - name: Cancel workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  Build-Android:
+    needs: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Android Build
+        shell: bash
+        run: echo 'Android' > android-build.txt
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: android-build
+          path: android-build.txt
+          retention-days: 1
+
+      - name: Cancel workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  Tag-Release:
+    needs: [Setup, Analysis, Tests, Build-iOS, Build-Android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          target_commitish: ${{ github.sha }}
+          tag_name: release-${{ needs.Setup.outputs.date }}
+          name: Release ${{ needs.Setup.outputs.date }}
+          files: |
+            ios-build/ios-build.txt
+            android-build/android-build.txt
+            test-report/test-report.txt
+            analysis-report/report-1.txt
+            analysis-report/report-2.txt
+            analysis-report/report-3.txt
